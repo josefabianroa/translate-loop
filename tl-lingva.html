@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Transcriptor y Traductor</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+
+    #botones {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      padding: 0.5rem;
+    }
+
+    button, select {
+      padding: 0.5rem 1rem;
+      font-size: 1rem;
+    }
+
+    #estado {
+      margin: 0.5rem;
+      font-weight: bold;
+    }
+
+    .contenedor {
+      display: flex;
+      flex: 1;
+      flex-direction: row;
+      transition: all 0.3s;
+    }
+
+    .columna {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 0.5rem;
+      transition: all 0.3s;
+    }
+
+    .oculta {
+      display: none;
+    }
+
+    .expandida {
+      flex: 1 1 100%;
+    }
+
+    textarea {
+      flex: 1;
+      resize: none;
+      padding: 1rem;
+      font-size: 1rem;
+      overflow-y: auto;
+    }
+
+    .titulo {
+      font-weight: bold;
+      margin-bottom: 0.5rem;
+    }
+
+    @media (max-width: 768px) {
+      .contenedor {
+        flex-direction: column;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="botones">
+    <button id="iniciar">🎙️ Iniciar</button>
+    <button id="borrar">🗑️ Borrar</button>
+    <button id="toggleTexto">📝 Ocultar texto original</button>
+    <button id="toggleAudio">🔊 Reproduciendo texto</button>
+    <button id="probarVoz">🗣️ Probar voz</button>
+
+    <select id="origen">
+      <option value="es">Español</option>
+      <option value="en">Inglés</option>
+      <option value="zh">Chino</option>
+      <option value="de">Alemán</option>
+    </select>
+
+    <select id="destino">
+      <option value="en">Inglés</option>
+      <option value="es">Español</option>
+      <option value="zh">Chino</option>
+      <option value="de">Alemán</option>
+    </select>
+
+    <select id="alternativas">
+      <option value="1">1 alternativa</option>
+      <option value="2">2 alternativas</option>
+      <option value="3">3 alternativas</option>
+    </select>
+  </div>
+
+  <div id="estado">Estado: Parado</div>
+
+  <div class="contenedor">
+    <div class="columna izquierda">
+      <div class="titulo">Texto original</div>
+      <textarea id="textoOriginal" readonly></textarea>
+    </div>
+    <div class="columna derecha">
+      <div class="titulo">Texto traducido</div>
+      <textarea id="textoTraducido" readonly></textarea>
+    </div>
+  </div>
+
+  <script>
+    const iniciarBtn = document.getElementById('iniciar');
+    const borrarBtn = document.getElementById('borrar');
+    const toggleTextBox = document.getElementById('toggleTexto');
+    const toggleAudioBtn = document.getElementById('toggleAudio');
+    const probarVozBtn = document.getElementById('probarVoz');
+
+    const textoOriginal = document.getElementById('textoOriginal');
+    const textoTraducido = document.getElementById('textoTraducido');
+    const estado = document.getElementById('estado');
+
+    const selectOrigen = document.getElementById('origen');
+    const selectDestino = document.getElementById('destino');
+    const selectAlternativas = document.getElementById('alternativas');
+
+    const columnaIzquierda = document.querySelector('.columna.izquierda');
+    const columnaDerecha = document.querySelector('.columna.derecha');
+
+    let reconocimiento;
+    let escuchando = false;
+    let reproducirAudio = true;
+
+    function actualizarEstado(texto) {
+      estado.textContent = 'Estado: ' + texto;
+    }
+
+    function iniciarReconocimiento() {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        alert('Este navegador no soporta reconocimiento de voz');
+        return;
+      }
+
+      reconocimiento = new SpeechRecognition();
+      reconocimiento.lang = selectOrigen.value;
+      reconocimiento.interimResults = false;
+      reconocimiento.maxAlternatives = parseInt(selectAlternativas.value);
+      reconocimiento.continuous = false;
+
+      reconocimiento.onstart = () => actualizarEstado('Esperando...');
+      reconocimiento.onresult = async (event) => {
+        const resultado = event.results[0][0].transcript.trim();
+        textoOriginal.value += resultado + '\n';
+        textoOriginal.scrollTop = textoOriginal.scrollHeight;
+
+        actualizarEstado('Traduciendo...');
+        const traduccion = await traducirTexto(resultado);
+        textoTraducido.value += traduccion + '\n';
+        textoTraducido.scrollTop = textoTraducido.scrollHeight;
+
+        if (reproducirAudio) {
+          const utter = new SpeechSynthesisUtterance(traduccion);
+          utter.lang = selectDestino.value;
+          speechSynthesis.speak(utter);
+        }
+        actualizarEstado('Esperando...');
+        if (escuchando) setTimeout(() => reconocimiento.start(), 300);
+      };
+
+      reconocimiento.onerror = (e) => {
+        console.error('Error:', e);
+        if (escuchando) setTimeout(() => reconocimiento.start(), 500);
+      };
+
+      reconocimiento.onend = () => {
+        if (escuchando) setTimeout(() => reconocimiento.start(), 500);
+        else actualizarEstado('Parado');
+      };
+
+      reconocimiento.start();
+    }
+
+    async function traducirTexto(texto) {
+      try {
+        const res = await fetch(`https://lingva.ml/api/v1/${selectOrigen.value}/${selectDestino.value}/${encodeURIComponent(texto)}`);
+        const data = await res.json();
+        return data.translation;
+      } catch (err) {
+        console.error('Error al traducir:', err);
+        return '[Error de traducción]';
+      }
+    }
+
+    iniciarBtn.addEventListener('click', () => {
+      if (!escuchando) {
+        escuchando = true;
+        iniciarReconocimiento();
+        iniciarBtn.textContent = '⏹️ Detener';
+      } else {
+        escuchando = false;
+        reconocimiento.stop();
+        iniciarBtn.textContent = '🎙️ Iniciar';
+      }
+    });
+
+    borrarBtn.addEventListener('click', () => {
+      textoOriginal.value = '';
+      textoTraducido.value = '';
+    });
+
+    toggleTextBox.addEventListener('click', () => {
+      const oculta = columnaIzquierda.classList.toggle('oculta');
+      toggleTextBox.textContent = oculta ? '📝 Mostrar texto original' : '📝 Ocultar texto original';
+      if (oculta) {
+        columnaDerecha.classList.add('expandida');
+      } else {
+        columnaDerecha.classList.remove('expandida');
+      }
+    });
+
+    toggleAudioBtn.addEventListener('click', () => {
+      reproducirAudio = !reproducirAudio;
+      toggleAudioBtn.textContent = reproducirAudio ? '🔊 Reproduciendo texto' : '🔇 Silenciando texto';
+    });
+
+    probarVozBtn.addEventListener('click', () => {
+      const utter = new SpeechSynthesisUtterance('Esto es una prueba de voz');
+      utter.lang = selectDestino.value;
+      speechSynthesis.speak(utter);
+    });
+
+    });
+  </script>
+</body>
+</html>
+
