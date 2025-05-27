@@ -58,7 +58,7 @@
 </head>
 <body>
 
-  <h2>🌐 Transcripción, Traducción y Voz - helios</h2>
+  <h2>🌐 Transcripción, Traducción y Voz - lingva - wan</h2>
 
   <div class="botones-container">
     <label for="idiomaOrigen">Idioma de entrada:</label>
@@ -211,30 +211,15 @@
     });
 
     async function traducirLibreTranslate(texto) {
-      const origen = idiomaOrigen.value;
-      const destino = idiomaDestino.value;
-      const url = 'https://srv-api-translate';
 
+      const destino = idiomaDestino.value;
       estadoTraduccion.textContent = "Estado: Traduciendo...";
 
       try {
-        const res = await fetch(url, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            q: texto,
-            source: origen,
-            target: destino,
-            format: "text"
-          })
-        });
-
-        if (!res.ok) throw new Error("Respuesta no válida del servidor");
-
+        const res = await fetch(`https://lingva.ml/api/v1/${idiomaOrigen.value}/${idiomaDestino.value}/${encodeURIComponent(texto)}`);
         const data = await res.json();
-        const traduccion = data.translatedText;
+
+        const traduccion = data.translation;
 
         textoTraducido.value += traduccion + '\n';
         autoScroll(textoTraducido);
