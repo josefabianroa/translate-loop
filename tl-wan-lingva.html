@@ -2,63 +2,15 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Transcripción y Traducción con LibreTranslate</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 0;
-      height: 100vh;
-      display: flex;
-      flex-direction: column;
-    }
-
-    .contenedor {
-      display: flex;
-      gap: 1em;
-      flex-grow: 1;
-      padding: 1em;
-    }
-
-    textarea {
-      width: 100%;
-      height: 100%;
-      font-size: 1.1em;
-      overflow-y: auto;
-      resize: none;
-    }
-
-    button, select {
-      padding: 10px 20px;
-      font-size: 1em;
-    }
-
-    .botones {
-      display: flex;
-      gap: 10px;
-      margin-top: 10px;
-      flex-wrap: wrap;
-    }
-
-    .botones-container {
-      padding: 1em;
-    }
-
-    #estadoTraduccion {
-      margin-bottom: 0.5em;
-      font-style: italic;
-      color: gray;
-    }
-
-    .columna {
-      width: 50%;
-      display: flex;
-      flex-direction: column;
-    }
-  </style>
+  <link rel="stylesheet" href="./estilos-tl.css" />
 </head>
 <body>
 
-  <h2>🌐 Transcripción, Traducción y Voz - lingva - wan</h2>
+  <h2>🌐 Transcripción, Traducción y Voz - wan - lingva</h2>
+
+  <button id="toggleControles" style="margin: 1em;">🎛️ Ocultar controles</button>
 
   <div class="botones-container">
     <label for="idiomaOrigen">Idioma de entrada:</label>
@@ -93,9 +45,10 @@
   </div>
 
   <div class="contenedor">
-    <textarea id="textoOriginal" placeholder="Texto original (voz)" readonly></textarea>
-
-    <div class="columna">
+    <div class="columna" id="columnaOriginal">
+      <textarea id="textoOriginal" placeholder="Texto original (voz)" readonly></textarea>
+    </div>
+    <div class="columna" id="columnaTraduccion">
       <div id="estadoTraduccion">Estado: Parado</div>
       <textarea id="textoTraducido" placeholder="Traducción" readonly></textarea>
     </div>
@@ -126,12 +79,19 @@
     recognition.maxAlternatives = alternativas;
 
     toggleTextBox.addEventListener('click', () => {
-      if (textoOriginal.style.display === 'none') {
-        textoOriginal.style.display = 'block';
-        toggleTextBox.textContent = '📝 Ocultar texto original';
-      } else {
-        textoOriginal.style.display = 'none';
+      const columnaOriginal = document.getElementById('columnaOriginal');
+      const columnaTraduccion = document.getElementById('columnaTraduccion');
+
+      const ocultando = !columnaOriginal.classList.contains('oculta');
+
+      if (ocultando) {
+        columnaOriginal.classList.add('oculta');
+        columnaTraduccion.classList.add('expandida');
         toggleTextBox.textContent = '📝 Mostrar texto original';
+      } else {
+        columnaOriginal.classList.remove('oculta');
+        columnaTraduccion.classList.remove('expandida');
+        toggleTextBox.textContent = '📝 Ocultar texto original';
       }
     });
 
@@ -211,14 +171,13 @@
     });
 
     async function traducirLibreTranslate(texto) {
-
+      const origen = idiomaOrigen.value;
       const destino = idiomaDestino.value;
       estadoTraduccion.textContent = "Estado: Traduciendo...";
 
       try {
-        const res = await fetch(`https://lingva.ml/api/v1/${idiomaOrigen.value}/${idiomaDestino.value}/${encodeURIComponent(texto)}`);
-        const data = await res.json();
-
+        const resl = await fetch(`https://lingva.ml/api/v1/${idiomaOrigen.value}/${idiomaDestino.value}/${encodeURIComponent(texto)}`);
+        const data = await resl.json();
         const traduccion = data.translation;
 
         textoTraducido.value += traduccion + '\n';
@@ -250,6 +209,15 @@
     function autoScroll(textarea) {
       textarea.scrollTop = textarea.scrollHeight;
     }
+
+    const toggleControles = document.getElementById('toggleControles');
+    const botonesContainer = document.querySelector('.botones-container');
+
+    toggleControles.addEventListener('click', () => {
+      const oculto = botonesContainer.classList.toggle('oculto');
+      toggleControles.textContent = oculto ? '🎛️ Mostrar controles' : '🎛️ Ocultar controles';
+    });
+
   </script>
 
 </body>
