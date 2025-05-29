@@ -1,0 +1,32 @@
+<IfModule mod_ssl.c>
+<VirtualHost *:443>
+
+        ProxyPreserveHost On
+
+        # /lt libre-translation
+        <Location /lt>
+          ProxyPass http://localhost:3011/
+          ProxyPassReverse http://localhost:3011/
+        
+          SetEnvIf Referer "^https://midomain" allow_referer
+          Require env allow_referer
+        </Location>
+
+	ServerAdmin webmaster@localhost
+	DocumentRoot /var/www/html
+
+	ErrorLog ${APACHE_LOG_DIR}/error.log
+	CustomLog ${APACHE_LOG_DIR}/access.log combined
+
+	ServerName midomain
+	SSLCertificateFile /etc/letsencrypt/live/midomain/fullchain.pem
+	SSLCertificateKeyFile /etc/letsencrypt/live/midomain/privkey.pem
+	Include /etc/letsencrypt/options-ssl-apache.conf
+
+	<Directory /var/www/html/>
+	  Options Indexes FollowSymLinks
+	  AllowOverride All
+	</Directory>
+</VirtualHost>
+</IfModule>
+
