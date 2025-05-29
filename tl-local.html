@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Transcripción y Traducción con LibreTranslate</title>
+  <link rel="stylesheet" href="./estilos-tl.css" />
+</head>
+<body>
+
+  <h2>🌐 Transcripción, Traducción y Voz - local v1.0</h2>
+
+  <button id="toggleControles" style="margin: 1em;">🎛️ Ocultar controles</button>
+
+  <div class="botones-container">
+    <label for="idiomaOrigen">Idioma de entrada:</label>
+    <select id="idiomaOrigen">
+      <option value="es">Español</option>
+      <option value="en">Inglés</option>
+      <option value="zh">Chino</option>
+    </select>
+
+    <label for="idiomaDestino">Idioma de destino:</label>
+    <select id="idiomaDestino">
+      <option value="en">Inglés</option>
+      <option value="es">Español</option>
+      <option value="zh">Chino</option>
+    </select>
+
+    <label for="alternativas">Alternativas de transcripción:</label>
+    <select id="alternativas">
+      <option value="1">1 Alternativa</option>
+      <option value="2">2 Alternativas</option>
+      <option value="3">3 Alternativas</option>
+      <option value="4">4 Alternativas</option>
+    </select>
+
+    <div class="botones">
+      <button id="botonTranscribir">🔴 Iniciar</button>
+      <button id="botonBorrar">🗑️ Borrar</button>
+      <button id="toggleTextBox">📝 Ocultar texto original</button>
+      <button id="toggleVoz">🔊 Reproduciendo texto</button>
+      <button id="botonProbarVoz">🔉 Probar voz</button>
+      <button id="botonProbarRed">🌐 Probar red</button>
+    </div>
+  </div>
+
+  <div class="contenedor">
+    <div class="columna" id="columnaOriginal">
+      <textarea id="textoOriginal" placeholder="Texto original (voz)" readonly></textarea>
+    </div>
+    <div class="columna" id="columnaTraduccion">
+      <div id="estadoTraduccion">Estado: Parado</div>
+      <textarea id="textoTraducido" placeholder="Traducción" readonly></textarea>
+    </div>
+  </div>
+
+  <script>
+    const botonTranscribir = document.getElementById('botonTranscribir');
+    const botonBorrar = document.getElementById('botonBorrar');
+    const botonProbarVoz = document.getElementById('botonProbarVoz');
+    const textoOriginal = document.getElementById('textoOriginal');
+    const botonProbarRed = document.getElementById('botonProbarRed');
+    const textoTraducido = document.getElementById('textoTraducido');
+    const idiomaOrigen = document.getElementById('idiomaOrigen');
+    const idiomaDestino = document.getElementById('idiomaDestino');
+    const toggleTextBox = document.getElementById('toggleTextBox');
+    const toggleVoz = document.getElementById('toggleVoz');
+    const alternativasSelect = document.getElementById('alternativas');
+    const estadoTraduccion = document.getElementById('estadoTraduccion');
+
+    let isSpeaking = true;
+    let alternativas = 1;
+    let escuchando = false;
+    let textoAcumulado = "";
+
+    const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+    recognition.continuous = true;
+    recognition.interimResults = false;
+    recognition.lang = "es-ES";
+    recognition.maxAlternatives = alternativas;
+
+    toggleTextBox.addEventListener('click', () => {
+      const columnaOriginal = document.getElementById('columnaOriginal');
+      const columnaTraduccion = document.getElementById('columnaTraduccion');
+
+      const ocultando = !columnaOriginal.classList.contains('oculta');
+
+      if (ocultando) {
+        columnaOriginal.classList.add('oculta');
+        columnaTraduccion.classList.add('expandida');
+        toggleTextBox.textContent = '📝 Mostrar texto original';
+      } else {
+        columnaOriginal.classList.remove('oculta');
+        columnaTraduccion.classList.remove('expandida');
+        toggleTextBox.textContent = '📝 Ocultar texto original';
+      }
+    });
+
+    toggleVoz.addEventListener('click', () => {
+      isSpeaking = !isSpeaking;
+      toggleVoz.textContent = isSpeaking ? '🔊 Reproduciendo texto' : '🔇 Silenciando texto';
+    });
+
+    alternativasSelect.addEventListener('change', (event) => {
+      alternativas = parseInt(event.target.value);
+      recognition.maxAlternatives = alternativas;
+    });
+
+    function reiniciarReconocimiento() {
+      setTimeout(() => {
+        try {
+          recognition.start();
+          console.log("🔄 Reconocimiento reiniciado");
+        } catch (e) {
+          console.warn("⚠️ Error al reiniciar:", e.message);
+        }
+      }, 100);
+    }
+
+    recognition.onresult = (event) => {
+      let textoFinal = '';
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
+        const resultado = event.results[i];
+        if (resultado.isFinal) {
+          textoFinal = resultado[0].transcript.trim();
+          if (textoFinal && textoFinal !== textoAcumulado) {
+            textoAcumulado = textoFinal;
+            textoOriginal.value += textoFinal + '\n';
+            autoScroll(textoOriginal);
+            traducirLibreTranslate(textoFinal);
+          }
+        }
+      }
+    };
+
+    recognition.onend = () => {
+      if (escuchando) reiniciarReconocimiento();
+    };
+
+    recognition.onerror = (event) => {
+      console.error("❗ Error en reconocimiento:", event.error);
+      if (escuchando) reiniciarReconocimiento();
+    };
+
+    botonTranscribir.addEventListener('click', () => {
+      if (!escuchando) {
+        try {
+          recognition.lang = idiomaOrigen.value;
+          recognition.start();
+          escuchando = true;
+          botonTranscribir.textContent = '🟢 Detener';
+          estadoTraduccion.textContent = "Estado: Esperando...";
+        } catch (e) {
+          console.error("❌ No se pudo iniciar:", e.message);
+        }
+      } else {
+        recognition.stop();
+        escuchando = false;
+        botonTranscribir.textContent = '🔴 Iniciar';
+        estadoTraduccion.textContent = "Estado: Parado";
+      }
+    });
+
+    botonBorrar.addEventListener('click', () => {
+      textoOriginal.value = '';
+      textoTraducido.value = '';
+      textoAcumulado = '';
+    });
+
+    botonProbarVoz.addEventListener('click', () => {
+      hablar("This is a test voice. Hello!", idiomaDestino.value);
+    });
+
+    botonProbarRed.addEventListener('click', () => {
+      window.open('https:///srv-libre-translate', '_blank');
+    });
+
+    async function traducirLibreTranslate(texto) {
+      const origen = idiomaOrigen.value;
+      const destino = idiomaDestino.value;
+      estadoTraduccion.textContent = "Estado: Traduciendo...";
+
+      try {
+        const url = 'https://srv-libre-translate/translate';
+        const res = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            q: texto,
+            source: origen,
+            target: destino,
+            format: "text"
+          })
+        });
+        if (!res.ok) throw new Error("Respuesta no válida del servidor");
+        const data = await res.json();
+        const traduccion = data.translatedText;
+
+        textoTraducido.value += traduccion + '\n';
+        autoScroll(textoTraducido);
+        if (isSpeaking) hablar(traduccion, destino);
+      } catch (err) {
+        textoTraducido.value += '[Error de traducción]\n';
+        console.error("❌ Error al traducir:", err.message);
+      } finally {
+        estadoTraduccion.textContent = escuchando ? "Estado: Esperando..." : "Estado: Parado";
+      }
+    }
+
+    function hablar(texto, idioma = 'en') {
+      const utterance = new SpeechSynthesisUtterance(texto);
+      utterance.lang = idioma;
+
+      const voces = speechSynthesis.getVoices();
+      const voz = voces.find(v => v.lang.startsWith(idioma));
+      if (voz) utterance.voice = voz;
+
+      speechSynthesis.speak(utterance);
+    }
+
+    window.speechSynthesis.onvoiceschanged = () => {
+      speechSynthesis.getVoices();
+    };
+
+    function autoScroll(textarea) {
+      textarea.scrollTop = textarea.scrollHeight;
+    }
+
+    const toggleControles = document.getElementById('toggleControles');
+    const botonesContainer = document.querySelector('.botones-container');
+
+    toggleControles.addEventListener('click', () => {
+      const oculto = botonesContainer.classList.toggle('oculto');
+      toggleControles.textContent = oculto ? '🎛️ Mostrar controles' : '🎛️ Ocultar controles';
+    });
+
+  </script>
+
+</body>
+</html>
+
